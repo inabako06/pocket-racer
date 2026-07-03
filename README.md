@@ -1,5 +1,9 @@
 # POCKET RACER
 
+[![POCKET RACER — gameplay video](https://img.youtube.com/vi/9SIinrNhNC8/maxresdefault.jpg)](https://youtu.be/9SIinrNhNC8)
+
+▶ **[Watch the gameplay video](https://youtu.be/9SIinrNhNC8)**
+
 A PlayStation-era style low-poly arcade racing game, built with TypeScript + Vite + Three.js + cannon-es.
 
 All assets (car bodies, tracks, textures, music and sound) are generated procedurally from primitives, Canvas and WebAudio — there are no external model, image or audio files.
