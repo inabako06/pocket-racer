@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POCKET RACER</title>
+    <style>
+      :root {
+        /* PS1-style muted palette */
+        --hud-fg: #ffffff;
+        --hud-shadow: #1a1a2e;
+        --hud-accent: #ffd23f;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: "Courier New", monospace;
+      }
+
+      #app {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      /* Upscale a low-res buffer for a pixelated look */
+      #game-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+
+      /* ---- HUD ---- */
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        color: var(--hud-fg);
+        text-shadow: 2px 2px 0 var(--hud-shadow);
+        user-select: none;
+      }
+
+      #hud-topleft {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        font-size: 20px;
+        line-height: 1.5;
+        font-weight: bold;
+      }
+
+      #hud-pos {
+        font-size: 26px;
+        color: var(--hud-accent);
+      }
+
+      #hud-time {
+        font-size: 26px;
+        color: var(--hud-accent);
+        margin-top: 2px;
+      }
+
+      #hud-laptimes {
+        font-size: 14px;
+        line-height: 1.35;
+        opacity: 0.9;
+        margin-top: 2px;
+      }
+
+      /* Minimap (top-right) */
+      #minimap {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 160px;
+        height: 160px;
+        background: rgba(10, 16, 30, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+      }
+
+      #hud-center {
+        position: absolute;
+        top: 38%;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-size: 84px;
+        font-weight: bold;
+        letter-spacing: 4px;
+        color: var(--hud-accent);
+        text-shadow: 4px 4px 0 var(--hud-shadow);
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      #hud-center.show {
+        opacity: 1;
+      }
+
+      #hud-help {
+        position: absolute;
+        bottom: 12px;
+        left: 16px;
+        font-size: 12px;
+        opacity: 0.7;
+        line-height: 1.4;
+      }
+
+      #pause-overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(10, 10, 30, 0.6);
+        color: var(--hud-fg);
+        font-size: 48px;
+        font-weight: bold;
+        letter-spacing: 6px;
+      }
+
+      #pause-overlay.show {
+        display: flex;
+      }
+
+      /* Gear (center-right) */
+      #hud-gear {
+        position: absolute;
+        right: 22px;
+        top: 50%;
+        transform: translateY(-50%);
+        text-align: center;
+        line-height: 1;
+      }
+      #hud-gear .gear-label {
+        font-size: 13px;
+        letter-spacing: 3px;
+        opacity: 0.75;
+        font-weight: bold;
+      }
+      #hud-gear-val {
+        font-size: 72px;
+        font-weight: bold;
+        color: var(--hud-accent);
+        text-shadow: 3px 3px 0 var(--hud-shadow);
+      }
+
+      /* Tachometer + speed (bottom-right) */
+      #hud-tach {
+        position: absolute;
+        right: 14px;
+        bottom: 12px;
+        width: 150px;
+        text-align: center;
+      }
+      #tach-gauge svg {
+        width: 150px;
+        height: 96px;
+        display: block;
+      }
+      #tach-readout {
+        margin-top: 2px;
+        line-height: 1.1;
+      }
+      #tach-speed-val {
+        font-size: 30px;
+        font-weight: bold;
+        color: var(--hud-accent);
+      }
+      #tach-readout .unit {
+        font-size: 12px;
+        color: var(--hud-fg);
+        margin-left: 2px;
+      }
+      #tach-rpm {
+        font-size: 12px;
+        opacity: 0.85;
+        font-weight: bold;
+      }
+
+      /* ---- Menu screens (mode / difficulty / course select) ---- */
+      #course-select,
+      #mode-select,
+      #difficulty-select {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(#0b1733, #24365e);
+        color: var(--hud-fg);
+        user-select: none;
+      }
+      #course-select.hidden,
+      #mode-select.hidden,
+      #difficulty-select.hidden {
+        display: none;
+      }
+      #course-select h1,
+      #mode-select h1,
+      #difficulty-select h1 {
+        font-size: 44px;
+        letter-spacing: 5px;
+        color: var(--hud-accent);
+        text-shadow: 3px 3px 0 var(--hud-shadow);
+        margin-bottom: 6px;
+      }
+      #course-select .sub,
+      #mode-select .sub,
+      #difficulty-select .sub {
+        font-size: 14px;
+        opacity: 0.85;
+        margin-bottom: 30px;
+      }
+      .course-cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        max-width: 540px;
+        justify-content: center;
+      }
+      .course-card {
+        width: 240px;
+        padding: 20px 18px;
+        border: 3px solid rgba(255, 255, 255, 0.25);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+        text-align: center;
+        pointer-events: auto;
+        transition: border-color 0.15s, transform 0.1s;
+      }
+      .course-card:hover {
+        border-color: var(--hud-accent);
+        transform: translateY(-4px);
+      }
+      .course-card .num {
+        font-size: 20px;
+        font-weight: bold;
+        color: var(--hud-accent);
+      }
+      .course-card .name {
+        font-size: 24px;
+        font-weight: bold;
+        margin: 8px 0;
+        line-height: 1.1;
+      }
+      .course-card .desc {
+        font-size: 12px;
+        opacity: 0.85;
+        line-height: 1.6;
+      }
+
+      /* Course select holds 10 courses — lay them out as a balanced 5x2 grid
+         that fits one screen (mode/difficulty screens keep the wider 2-up look). */
+      #course-select .course-cards {
+        max-width: 1040px;
+        gap: 12px;
+      }
+      #course-select .course-card {
+        width: 198px;
+        padding: 12px 10px;
+      }
+      #course-select .course-card .name {
+        font-size: 17px;
+        margin: 5px 0;
+      }
+      #course-select .course-card .desc {
+        font-size: 10.5px;
+        line-height: 1.4;
+      }
+
+      /* ---- Car select screen (same look as course select) ---- */
+      #car-select {
+        position: absolute;
+        inset: 0;
+        z-index: 11;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(#0b1733, #24365e);
+        color: var(--hud-fg);
+        user-select: none;
+      }
+      #car-select.hidden {
+        display: none;
+      }
+      #car-select h1 {
+        font-size: 44px;
+        letter-spacing: 5px;
+        color: var(--hud-accent);
+        text-shadow: 3px 3px 0 var(--hud-shadow);
+        margin-bottom: 6px;
+      }
+      #car-select .sub {
+        font-size: 14px;
+        opacity: 0.85;
+        margin-bottom: 26px;
+      }
+      .car-cards {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 980px;
+      }
+      .car-card {
+        width: 176px;
+        padding: 14px 14px 16px;
+        border: 3px solid rgba(255, 255, 255, 0.25);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+        text-align: center;
+        pointer-events: auto;
+        transition: border-color 0.15s, transform 0.1s;
+      }
+      .car-card:hover {
+        border-color: var(--hud-accent);
+        transform: translateY(-4px);
+      }
+      .car-card .num {
+        font-size: 16px;
+        font-weight: bold;
+        color: var(--hud-accent);
+      }
+      .car-card .car-3d {
+        display: block;
+        width: 100%;
+        height: 104px;
+        border-radius: 5px;
+        margin: 8px 0;
+        border: 2px solid rgba(255, 255, 255, 0.28);
+        background: radial-gradient(circle at 50% 38%, #2b3d64, #0e1730);
+      }
+      .car-card:hover .car-3d {
+        border-color: var(--hud-accent);
+      }
+      .car-card .name {
+        font-size: 17px;
+        font-weight: bold;
+        line-height: 1.1;
+      }
+      .car-card .name-ja {
+        font-size: 12px;
+        opacity: 0.8;
+        margin-bottom: 8px;
+      }
+      .car-card .stat {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        margin: 3px 0;
+      }
+      .car-card .stat .k {
+        width: 42px;
+        text-align: left;
+        opacity: 0.85;
+      }
+      .car-card .bar {
+        flex: 1;
+        height: 7px;
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .car-card .bar > i {
+        display: block;
+        height: 100%;
+        background: var(--hud-accent);
+      }
+      .car-card .desc {
+        font-size: 11px;
+        opacity: 0.85;
+        line-height: 1.5;
+        margin-top: 8px;
+        min-height: 32px;
+      }
+
+      /* ---- Result screen ---- */
+      #result {
+        position: absolute;
+        inset: 0;
+        z-index: 12;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(6, 12, 28, 0.82);
+        color: var(--hud-fg);
+        user-select: none;
+        cursor: pointer;
+      }
+      #result.show {
+        display: flex;
+      }
+      .result-box {
+        width: 460px;
+        max-width: 92vw;
+        padding: 26px 30px 30px;
+        border: 3px solid rgba(255, 255, 255, 0.25);
+        border-radius: 10px;
+        background: linear-gradient(#0b1733, #24365e);
+        text-align: center;
+      }
+      .result-box h1 {
+        font-size: 40px;
+        letter-spacing: 6px;
+        color: var(--hud-accent);
+        text-shadow: 3px 3px 0 var(--hud-shadow);
+        margin-bottom: 18px;
+      }
+      #result-table {
+        margin-bottom: 18px;
+      }
+      .result-row {
+        display: flex;
+        align-items: center;
+        font-size: 19px;
+        font-weight: bold;
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .result-row.you {
+        color: var(--hud-accent);
+        background: rgba(255, 210, 63, 0.12);
+        border-radius: 4px;
+      }
+      .result-row .rp {
+        width: 38px;
+        text-align: left;
+      }
+      .result-row .rn {
+        flex: 1;
+        text-align: left;
+      }
+      .result-row .rt {
+        font-variant-numeric: tabular-nums;
+      }
+      #result-time {
+        font-size: 22px;
+        color: var(--hud-accent);
+        font-weight: bold;
+        margin-top: 6px;
+      }
+      #result-laps {
+        font-size: 14px;
+        opacity: 0.9;
+        margin-top: 6px;
+      }
+      /* Arcade points block on the result screen */
+      #result-arcade {
+        margin-bottom: 14px;
+      }
+      #result-arcade:empty {
+        display: none;
+      }
+      #result-arcade .ar-course {
+        font-size: 14px;
+        letter-spacing: 2px;
+        opacity: 0.85;
+        margin-bottom: 6px;
+      }
+      #result-arcade .ar-line {
+        font-size: 28px;
+        font-weight: bold;
+        color: var(--hud-accent);
+        text-shadow: 2px 2px 0 var(--hud-shadow);
+      }
+      #result-arcade .ar-goal {
+        font-size: 16px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        margin-top: 4px;
+        color: #6fe08a;
+      }
+      #result-arcade .ar-goal.out {
+        color: #ff6b6b;
+      }
+      .result-box .sub {
+        font-size: 13px;
+        opacity: 0.8;
+        margin-top: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+      <div id="hud">
+        <div id="hud-topleft">
+          <div id="hud-pos">POS 1/5</div>
+          <div id="hud-lap">LAP 1/2</div>
+          <div id="hud-time">0:00.00</div>
+          <div id="hud-laptimes"></div>
+          <div id="hud-fps">FPS 60</div>
+        </div>
+        <canvas id="minimap" width="160" height="160"></canvas>
+        <div id="hud-center"></div>
+        <div id="hud-gear">
+          <div class="gear-label">GEAR</div>
+          <div id="hud-gear-val">1</div>
+        </div>
+        <div id="hud-tach">
+          <div id="tach-gauge"></div>
+          <div id="tach-readout">
+            <span id="tach-speed-val">0</span><span class="unit">km/h</span>
+            <div id="tach-rpm">0 rpm</div>
+          </div>
+        </div>
+        <div id="hud-help">
+          Z Accel / X Brake / ← → Steer<br />
+          C Camera / Esc Pause / M Mute
+        </div>
+        <div id="pause-overlay">PAUSE</div>
+      </div>
+      <div id="mode-select">
+        <h1>POCKET RACER</h1>
+        <div class="sub">Select a mode — click or press [1]–[2]</div>
+        <div class="course-cards">
+          <div class="course-card" data-mode="arcade">
+            <div class="num">1</div>
+            <div class="name">ARCADE</div>
+            <div class="desc">
+              Race 4 courses in a row.<br />
+              Score 3/2/1 PT for finishing 1st/2nd/3rd.<br />
+              Finish 4th or 5th and it's game over.
+            </div>
+          </div>
+          <div class="course-card" data-mode="free">
+            <div class="num">2</div>
+            <div class="name">FREE RUN</div>
+            <div class="desc">
+              Pick any single course<br />
+              and just drive.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="difficulty-select" class="hidden">
+        <h1>ARCADE</h1>
+        <div class="sub">Select difficulty — click or press [1]–[2]</div>
+        <div class="course-cards">
+          <div class="course-card" data-diff="beginner">
+            <div class="num">1</div>
+            <div class="name">BEGINNER</div>
+            <div class="desc">
+              Oval → Beginner Circuit<br />
+              → Highland Dirt → Tunnel Express
+            </div>
+          </div>
+          <div class="course-card" data-diff="expert">
+            <div class="num">2</div>
+            <div class="name">EXPERT</div>
+            <div class="desc">
+              Tunnel Long → Forest River<br />
+              → Mountain Pass → Grand Circuit
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="car-select" class="hidden">
+        <h1>POCKET RACER</h1>
+        <div class="sub">Select your car — click or press [1]–[5]</div>
+        <div class="car-cards">
+          <div class="car-card" data-car="lion">
+            <div class="num">1</div>
+            <canvas class="car-3d"></canvas>
+            <div class="name">RED LION</div>
+            <div class="stat"><span class="k">ACCEL</span><span class="bar"><i style="width:50%"></i></span></div>
+            <div class="stat"><span class="k">SPEED</span><span class="bar"><i style="width:50%"></i></span></div>
+            <div class="stat"><span class="k">STEER</span><span class="bar"><i style="width:50%"></i></span></div>
+            <div class="desc">Balanced all-rounder. The benchmark car.</div>
+          </div>
+          <div class="car-card" data-car="hawk">
+            <div class="num">2</div>
+            <canvas class="car-3d"></canvas>
+            <div class="name">WHITE HAWK</div>
+            <div class="stat"><span class="k">ACCEL</span><span class="bar"><i style="width:35%"></i></span></div>
+            <div class="stat"><span class="k">SPEED</span><span class="bar"><i style="width:65%"></i></span></div>
+            <div class="stat"><span class="k">STEER</span><span class="bar"><i style="width:50%"></i></span></div>
+            <div class="desc">Modest acceleration, but a high top speed.</div>
+          </div>
+          <div class="car-card" data-car="whale">
+            <div class="num">3</div>
+            <canvas class="car-3d"></canvas>
+            <div class="name">BLUE WHALE</div>
+            <div class="stat"><span class="k">ACCEL</span><span class="bar"><i style="width:70%"></i></span></div>
+            <div class="stat"><span class="k">SPEED</span><span class="bar"><i style="width:38%"></i></span></div>
+            <div class="stat"><span class="k">STEER</span><span class="bar"><i style="width:55%"></i></span></div>
+            <div class="desc">Lower top speed, but sharp acceleration.</div>
+          </div>
+          <div class="car-card" data-car="piranha">
+            <div class="num">4</div>
+            <canvas class="car-3d"></canvas>
+            <div class="name">YELLOW PIRANHA</div>
+            <div class="stat"><span class="k">ACCEL</span><span class="bar"><i style="width:55%"></i></span></div>
+            <div class="stat"><span class="k">SPEED</span><span class="bar"><i style="width:33%"></i></span></div>
+            <div class="stat"><span class="k">STEER</span><span class="bar"><i style="width:100%"></i></span></div>
+            <div class="desc">Lower top speed, but very sharp steering.</div>
+          </div>
+          <div class="car-card" data-car="wyvern">
+            <div class="num">5</div>
+            <canvas class="car-3d"></canvas>
+            <div class="name">BLACK WYVERN</div>
+            <div class="stat"><span class="k">ACCEL</span><span class="bar"><i style="width:30%"></i></span></div>
+            <div class="stat"><span class="k">SPEED</span><span class="bar"><i style="width:80%"></i></span></div>
+            <div class="stat"><span class="k">STEER</span><span class="bar"><i style="width:8%"></i></span></div>
+            <div class="desc">Sluggish steering and acceleration, but the top speed king.</div>
+          </div>
+        </div>
+      </div>
+      <div id="course-select" class="hidden">
+        <h1>POCKET RACER</h1>
+        <div class="sub">Select a course — click or press [1]–[9], [0]</div>
+        <div class="course-cards">
+          <div class="course-card" data-track="oval">
+            <div class="num">1</div>
+            <div class="name">OVAL</div>
+            <div class="desc">A simple oval.<br />The classic practice track.</div>
+          </div>
+          <div class="course-card" data-track="beginner">
+            <div class="num">2</div>
+            <div class="name">BEGINNER<br />CIRCUIT</div>
+            <div class="desc">A beginner circuit.<br />Flat-out and easy to flow.</div>
+          </div>
+          <div class="course-card" data-track="tunnel">
+            <div class="num">3</div>
+            <div class="name">TUNNEL<br />EXPRESS</div>
+            <div class="desc">Underground speed tunnel.<br />Streaming lights, fast corners.</div>
+          </div>
+          <div class="course-card" data-track="tunnelLong">
+            <div class="num">4</div>
+            <div class="name">TUNNEL<br />LONG</div>
+            <div class="desc">Advanced long tunnel.<br />Tight corners where it narrows.</div>
+          </div>
+          <div class="course-card" data-track="highland">
+            <div class="num">5</div>
+            <div class="name">HIGHLAND<br />DIRT</div>
+            <div class="desc">Mountain dirt highland.<br />Narrow, slippery, final hairpin.</div>
+          </div>
+          <div class="course-card" data-track="touge">
+            <div class="num">6</div>
+            <div class="name">MOUNTAIN<br />PASS</div>
+            <div class="desc">Long narrow pass (~1:30).<br />Climbs, a bridge, sharp corner after.</div>
+          </div>
+          <div class="course-card" data-track="forest">
+            <div class="num">7</div>
+            <div class="name">FOREST<br />RIVER</div>
+            <div class="desc">Narrow forest dirt road.<br />Ford a river — rocks bounce you.</div>
+          </div>
+          <div class="course-card" data-track="circuit">
+            <div class="num">8</div>
+            <div class="name">GRAND<br />CIRCUIT</div>
+            <div class="desc">Advanced circuit. Wide straight,<br />hairpin, esses &amp; hills.</div>
+          </div>
+          <div class="course-card" data-track="suzuka">
+            <div class="num">9</div>
+            <div class="name">SUZUKA<br />SPECIAL</div>
+            <div class="desc">Figure-8 grand circuit (~2.1km).<br />Esses, hairpin, spoon &amp; chicane.</div>
+          </div>
+          <div class="course-card" data-track="shutoko">
+            <div class="num">0</div>
+            <div class="name">SHUTOKO<br />NIGHT</div>
+            <div class="desc">Night metro expressway (~1.9km).<br />Winding lanes, hairpin, climbs.</div>
+          </div>
+        </div>
+      </div>
+      <div id="result">
+        <div class="result-box">
+          <h1 id="result-title">RESULT</h1>
+          <div id="result-arcade"></div>
+          <div id="result-table"></div>
+          <div id="result-time">RACE TIME 0:00.00</div>
+          <div id="result-laps"></div>
+          <div class="sub" id="result-sub">Click to return to title</div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+# Dependencies & build output
+node_modules
+dist
+
+# OS / editor cruft
+.DS_Store
+*.local
+
+# Local Claude Code tooling & machine-specific settings (contains absolute paths)
+.claude/
+
+# Downloaded Node runtime (this machine has no system Node; fetched into the repo)
+node.tgz
+node-v*-darwin-*/
+node-v*-linux-*/
+
+# Reference-only material (third-party car photos; NOT used at runtime)
+image.png
+image2.png
+
+# Internal development notes (contains absolute paths & design history; not for publication)
+CLAUDE.md
