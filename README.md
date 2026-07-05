@@ -1,5 +1,9 @@
 # POCKET RACER
 
+### 🎮 [▶ Play now in your browser](https://inabako06.github.io/pocket-racer/)
+
+[![Play now](https://img.shields.io/badge/%E2%96%B6%20Play%20now-inabako06.github.io%2Fpocket--racer-2ea44f?style=for-the-badge)](https://inabako06.github.io/pocket-racer/)
+
 [![POCKET RACER — gameplay video](https://img.youtube.com/vi/9SIinrNhNC8/maxresdefault.jpg)](https://youtu.be/9SIinrNhNC8)
 
 ▶ **[Watch the gameplay video](https://youtu.be/9SIinrNhNC8)**
