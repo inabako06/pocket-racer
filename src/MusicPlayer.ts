@@ -135,13 +135,22 @@ export class MusicPlayer {
     }
   }
 
-  /** 指定の曲をループ再生する（既に同じ曲なら何もしない）。 */
+  /**
+   * 指定の曲をループ再生する（既に同じ曲なら何もしない）。
+   * ミュート中は「流すべき曲」を覚えるだけで AudioContext を作らない
+   * （iOS でバックグラウンド再生中の他アプリの音楽を止めないため）。
+   * ミュート解除（setMuted(false)）時に覚えた曲から再生を始める。
+   */
   play(id: MusicTrackId): void {
     if (this.current === id && this.timer !== null) return;
-    if (!this.ensureCtx() || !this.ctx) return;
-    this.stopScheduler();
     this.current = id;
     this.song = SONGS[id];
+    if (this.muted) {
+      this.stopScheduler();
+      return;
+    }
+    if (!this.ensureCtx() || !this.ctx) return;
+    this.stopScheduler();
     this.beatDur = 60 / this.song.bpm;
     this.loopLen = this.song.lengthBeats * this.beatDur;
     this.loopStart = this.ctx.currentTime + 0.1;
@@ -178,6 +187,13 @@ export class MusicPlayer {
         this.ctx.currentTime,
         0.05
       );
+    }
+    // ミュート解除：保留していた曲があればここから再生を始める
+    // （ミュート中の play() は曲を覚えるだけで鳴らしていない）
+    if (!m && this.current !== null && this.timer === null) {
+      const id = this.current;
+      this.current = null; // play() の同曲ガードを確実に通す
+      this.play(id);
     }
   }
 

@@ -121,9 +121,21 @@ export class EngineSound {
     this.voice = ENGINE_VOICES[style] ?? ENGINE_VOICES.lion;
   }
 
-  /** 最初のユーザー操作後に呼ぶ。AudioContext を作って鳴らし始める。 */
+  /**
+   * ミュート状態を設定する。ミュート解除時に AudioContext がまだ無ければ
+   * 呼び出し側（Game）が改めて start() を呼ぶこと。
+   */
+  setMuted(m: boolean): void {
+    this.muted = m;
+  }
+
+  /**
+   * 最初のユーザー操作後に呼ぶ。AudioContext を作って鳴らし始める。
+   * ミュート中は何もしない（AudioContext を作るだけで iOS はバックグラウンド
+   * 再生中の他アプリの音楽を止めてしまうため、解除まで一切作らない）。
+   */
   start(): void {
-    if (this.started) return;
+    if (this.started || this.muted) return;
     try {
       const Ctx =
         window.AudioContext ||
@@ -300,8 +312,4 @@ export class EngineSound {
     });
   }
 
-  toggleMute(): boolean {
-    this.muted = !this.muted;
-    return this.muted;
-  }
 }

@@ -3,6 +3,9 @@ import { CarTuning } from "./CarTuning";
 import type { TrackId } from "./RaceTrack";
 import { music } from "./MusicPlayer";
 import { initCarPreviews } from "./CarPreview";
+import { initTouchControls } from "./TouchControls";
+import { virtualInput } from "./Input";
+import { isMuted, onMuteChange, toggleGlobalMuted } from "./AudioMute";
 
 /**
  * エントリポイント。
@@ -24,6 +27,9 @@ if (!canvas) {
 
 // 開発中の調整用：コンソールから CarTuning.EnginePower = 1000 等で即変更できる
 (window as unknown as { CarTuning: typeof CarTuning }).CarTuning = CarTuning;
+
+// BGM にグローバルのミュート状態（既定＝ミュート）を反映してから boot する
+music.setMuted(isMuted());
 
 const modeSelect = document.getElementById("mode-select");
 const diffSelect = document.getElementById("difficulty-select");
@@ -128,6 +134,33 @@ function primeMenuMusic(): void {
 }
 window.addEventListener("pointerdown", primeMenuMusic);
 window.addEventListener("keydown", primeMenuMusic);
+
+// --- SND（ミュート切替）ボタン：全画面共通・上中央の小型ボタン ------------
+// 既定はミュート（AudioMute.ts）。このボタン（または M キー）で初めて音が鳴る。
+const muteBtn = document.getElementById("mute-btn");
+
+function renderMuteBtn(m: boolean): void {
+  if (!muteBtn) return;
+  muteBtn.textContent = m ? "SND OFF" : "SND ON";
+  muteBtn.classList.toggle("is-on", !m);
+}
+onMuteChange(renderMuteBtn);
+renderMuteBtn(isMuted());
+
+muteBtn?.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  e.stopPropagation(); // primeMenuMusic（window の pointerdown）より先に処理
+  if (started) {
+    // レース中は Game のループに処理させる（エンジン音・効果音も一緒に切替）
+    virtualInput.muteToggle = true;
+    virtualInput.anyTouch = true;
+  } else {
+    // メニュー中：ここで直接切り替える。解除ならメニュー曲をここから鳴らす
+    const m = toggleGlobalMuted();
+    music.setMuted(m);
+    if (!m) music.play("menu");
+  }
+});
 
 // --- メニュー操作（クリック）-------------------------------------------
 
@@ -251,5 +284,8 @@ function boot(): void {
 
 // 車選択カードに 3D プレビュー（ホバーで横回転）を仕込む
 if (carSelect) initCarPreviews(carSelect);
+
+// スマホ/タブレット：画面上のタッチ操作ボタンを有効化（?touch で強制）
+initTouchControls();
 
 boot();

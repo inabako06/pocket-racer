@@ -6,6 +6,7 @@
   "description": "PlayStation-era style low-poly arcade racing game",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

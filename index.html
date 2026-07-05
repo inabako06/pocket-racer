@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>POCKET RACER</title>
     <style>
       :root {
@@ -25,12 +28,17 @@
         overflow: hidden;
         background: #000;
         font-family: "Courier New", monospace;
+        /* スマホ：ピンチズーム/ダブルタップズーム/引っ張り更新を抑止 */
+        touch-action: manipulation;
+        overscroll-behavior: none;
       }
 
       #app {
         position: relative;
         width: 100vw;
         height: 100vh;
+        /* モバイルブラウザのアドレスバーを除いた実表示域に合わせる */
+        height: 100dvh;
       }
 
       /* Upscale a low-res buffer for a pixelated look */
@@ -498,6 +506,338 @@
         opacity: 0.8;
         margin-top: 18px;
       }
+
+      /* ---- Touch controls (on-screen buttons for phones/tablets) ---- */
+      #touch-controls {
+        position: absolute;
+        inset: 0;
+        z-index: 5; /* HUDの上・メニュー/リザルト(z10〜12)の下 */
+        pointer-events: none;
+        display: none;
+        color: var(--hud-fg);
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      body.touch #touch-controls {
+        display: block;
+      }
+      .tc-btn,
+      .tc-half {
+        pointer-events: auto;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        letter-spacing: 1px;
+        background: rgba(16, 24, 46, 0.42);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        text-shadow: 2px 2px 0 var(--hud-shadow);
+      }
+      .tc-btn.pressed,
+      .tc-half.pressed {
+        background: rgba(255, 210, 63, 0.38);
+        border-color: var(--hud-accent);
+      }
+      /* ステアパッド（左下・左右2分割） */
+      #tc-steer {
+        position: absolute;
+        left: calc(12px + env(safe-area-inset-left, 0px));
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        display: flex;
+        gap: 8px;
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .tc-half {
+        width: 88px;
+        height: 88px;
+        border-radius: 16px;
+        font-size: 30px;
+      }
+      /* ペダル（右下・GAS大 / BRK小） */
+      #tc-pedals {
+        position: absolute;
+        right: calc(12px + env(safe-area-inset-right, 0px));
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+      }
+      #tc-brake {
+        width: 62px;
+        height: 62px;
+        border-radius: 50%;
+        font-size: 12px;
+      }
+      #tc-accel {
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        font-size: 16px;
+      }
+      /* 補助ボタン（上中央・CAM/PAUSE）。中央の常設 SND を挟んで左右対称に、
+         画面中心からの固定オフセットで配置（ミニマップ/HUD と被らない） */
+      #tc-menu {
+        position: absolute;
+        top: calc(8px + env(safe-area-inset-top, 0px));
+        left: 0;
+        right: 0;
+        pointer-events: none;
+      }
+      #tc-menu .tc-btn {
+        position: absolute;
+        top: 0;
+      }
+      #tc-menu [data-tap="camera"] {
+        right: calc(50% + 44px);
+      }
+      #tc-menu [data-tap="pause"] {
+        left: calc(50% + 44px);
+      }
+      .tc-small {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 10px;
+      }
+      /* SND（ミュート切替）：全画面共通・上中央の常設小型ボタン。
+         メニュー/リザルトより上に重ねる（既定ミュート＝これで初めて音が出る） */
+      #mute-btn {
+        position: absolute;
+        top: calc(8px + env(safe-area-inset-top, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        opacity: 0.85;
+      }
+      #mute-btn.is-on {
+        color: var(--hud-accent);
+        border-color: var(--hud-accent);
+        opacity: 1;
+      }
+
+      /* 狭い縦持ち（iPhone 14〜17 の 390〜430pt 基準）：
+         ステアパッドとペダルが重ならないよう全体を少し縮める */
+      @media (max-width: 460px) {
+        #tc-steer {
+          left: calc(10px + env(safe-area-inset-left, 0px));
+          bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        }
+        .tc-half {
+          width: 80px;
+          height: 80px;
+          font-size: 26px;
+        }
+        #tc-pedals {
+          right: calc(10px + env(safe-area-inset-right, 0px));
+          bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+          gap: 10px;
+        }
+        #tc-brake {
+          width: 56px;
+          height: 56px;
+          font-size: 11px;
+        }
+        #tc-accel {
+          width: 90px;
+          height: 90px;
+          font-size: 15px;
+        }
+        /* 狭い画面では上中央のボタン列と被らないようミニマップも少し縮める
+           （後方の body.touch #minimap より詳細度を上げて勝たせる） */
+        body.touch #hud #minimap {
+          width: 88px;
+          height: 88px;
+        }
+        /* 上部の小ボタン（CAM/SND/PAUSE）も一段縮小 */
+        .tc-small {
+          font-size: 9px;
+          padding: 3px 6px;
+        }
+      }
+
+      /* ダブルタップズーム抑止（iOS Safari は user-scalable=no を無視するため、
+         全要素に touch-action: manipulation を指定して無効化する） */
+      #app,
+      #app * {
+        touch-action: manipulation;
+      }
+      #tc-steer,
+      #app .tc-half,
+      #app .tc-btn,
+      #mute-btn {
+        touch-action: none;
+      }
+
+      /* ---- Mobile HUD (body.touch = タッチデバイス時に縮小/再配置) ---- */
+      body.touch #hud-help {
+        display: none; /* キーボードのヘルプはタッチでは不要 */
+      }
+      body.touch #hud-topleft {
+        /* ノッチ/Dynamic Island を避ける（横持ちで左端が切り欠きに重なるため、
+           safe-area の分だけ中央寄りへ） */
+        top: calc(10px + env(safe-area-inset-top, 0px));
+        left: calc(12px + env(safe-area-inset-left, 0px));
+        font-size: 13px;
+        line-height: 1.4;
+      }
+      body.touch #hud-pos,
+      body.touch #hud-time {
+        font-size: 18px;
+      }
+      body.touch #hud-laptimes {
+        font-size: 10px;
+      }
+      body.touch #minimap {
+        top: calc(10px + env(safe-area-inset-top, 0px));
+        right: calc(10px + env(safe-area-inset-right, 0px));
+        width: 100px;
+        height: 100px;
+      }
+      body.touch #hud-center {
+        font-size: 44px;
+        letter-spacing: 2px;
+        text-shadow: 3px 3px 0 var(--hud-shadow);
+      }
+      /* ギアはミニマップの下へ（右中央はペダルと干渉するため） */
+      body.touch #hud-gear {
+        top: calc(120px + env(safe-area-inset-top, 0px));
+        right: calc(16px + env(safe-area-inset-right, 0px));
+        transform: none;
+      }
+      body.touch #hud-gear .gear-label {
+        font-size: 10px;
+        letter-spacing: 2px;
+      }
+      body.touch #hud-gear-val {
+        font-size: 38px;
+      }
+      /* タコメータはペダルの上へ */
+      body.touch #hud-tach {
+        right: calc(10px + env(safe-area-inset-right, 0px));
+        bottom: calc(116px + env(safe-area-inset-bottom, 0px));
+        width: 100px;
+      }
+      body.touch #tach-gauge svg {
+        width: 100px;
+        height: 64px;
+      }
+      body.touch #tach-speed-val {
+        font-size: 20px;
+      }
+      body.touch #tach-rpm {
+        font-size: 10px;
+      }
+      body.touch #pause-overlay {
+        font-size: 30px;
+        letter-spacing: 4px;
+      }
+
+      /* ---- Mobile menus (小さい画面ではスクロール可・カード縮小) ---- */
+      @media (max-width: 860px), (max-height: 520px) {
+        #mode-select,
+        #difficulty-select,
+        #car-select,
+        #course-select {
+          justify-content: flex-start;
+          overflow-y: auto;
+          /* 上は常設の SND ボタン（上中央）と被らないよう空ける */
+          padding: calc(40px + env(safe-area-inset-top, 0px)) 10px
+            calc(26px + env(safe-area-inset-bottom, 0px));
+          -webkit-overflow-scrolling: touch;
+        }
+        #mode-select h1,
+        #difficulty-select h1,
+        #car-select h1,
+        #course-select h1 {
+          font-size: 28px;
+          letter-spacing: 3px;
+          margin-bottom: 4px;
+        }
+        #mode-select .sub,
+        #difficulty-select .sub,
+        #car-select .sub,
+        #course-select .sub {
+          font-size: 12px;
+          margin-bottom: 14px;
+          text-align: center;
+        }
+        .course-cards {
+          gap: 10px;
+          max-width: 100%;
+        }
+        .course-card {
+          width: min(220px, 45vw);
+          padding: 12px 8px;
+        }
+        .course-card .num {
+          font-size: 15px;
+        }
+        .course-card .name {
+          font-size: 16px;
+          margin: 5px 0;
+        }
+        .course-card .desc {
+          font-size: 10px;
+          line-height: 1.45;
+        }
+        #course-select .course-cards {
+          gap: 8px;
+        }
+        #course-select .course-card {
+          width: min(170px, 45vw);
+          padding: 10px 6px;
+        }
+        #course-select .course-card .name {
+          font-size: 14px;
+        }
+        #course-select .course-card .desc {
+          font-size: 9.5px;
+        }
+        .car-cards {
+          gap: 10px;
+          max-width: 100%;
+        }
+        .car-card {
+          width: min(172px, 45vw);
+          padding: 10px 10px 12px;
+        }
+        .car-card .car-3d {
+          height: 84px;
+        }
+        .car-card .name {
+          font-size: 14px;
+        }
+        .car-card .desc {
+          font-size: 10px;
+          min-height: 0;
+        }
+        .result-box {
+          padding: 18px 16px 20px;
+        }
+        .result-box h1 {
+          font-size: 28px;
+          letter-spacing: 4px;
+          margin-bottom: 12px;
+        }
+        .result-row {
+          font-size: 15px;
+          padding: 4px 6px;
+        }
+        #result-time {
+          font-size: 17px;
+        }
+        #result-laps {
+          font-size: 12px;
+        }
+        #result-arcade .ar-line {
+          font-size: 21px;
+        }
+        #result-arcade .ar-goal {
+          font-size: 13px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -530,6 +870,21 @@
         </div>
         <div id="pause-overlay">PAUSE</div>
       </div>
+      <div id="touch-controls">
+        <div id="tc-steer">
+          <div class="tc-half" id="tc-steer-left">&#9664;</div>
+          <div class="tc-half" id="tc-steer-right">&#9654;</div>
+        </div>
+        <div id="tc-pedals">
+          <div class="tc-btn" id="tc-brake" data-hold="brake">BRK</div>
+          <div class="tc-btn" id="tc-accel" data-hold="accel">GAS</div>
+        </div>
+        <div id="tc-menu">
+          <div class="tc-btn tc-small" data-tap="camera">CAM</div>
+          <div class="tc-btn tc-small" data-tap="pause">PAUSE</div>
+        </div>
+      </div>
+      <div id="mute-btn" class="tc-btn tc-small">SND OFF</div>
       <div id="mode-select">
         <h1>POCKET RACER</h1>
         <div class="sub">Select a mode — click or press [1]–[2]</div>

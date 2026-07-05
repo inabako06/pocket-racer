@@ -19,6 +19,7 @@ import { CAR_ROSTER, getCarSpec, type CarSpec } from "./CarRoster";
 import { CameraController } from "./CameraController";
 import { EngineSound } from "./EngineSound";
 import { music, type MusicTrackId } from "./MusicPlayer";
+import { isMuted, toggleGlobalMuted } from "./AudioMute";
 import { HUD } from "./HUD";
 
 /**
@@ -294,6 +295,8 @@ export class Game {
     music.play(this.musicId);
 
     // プレイヤーの車種に合わせてエンジン音色を設定（start 前に）
+    // グローバルのミュート状態も反映（既定ミュート＝SND ボタンで解除するまで無音）
+    this.engineSound.setMuted(isMuted());
     this.engineSound.setVoice(getCarSpec(playerSpecId).style);
 
     // --- 出場 5 台をグリッドに配置（AI ブーストはコースごとに変える）---
@@ -511,15 +514,21 @@ export class Game {
     if (edge.pauseToggle) this.togglePause();
     if (edge.cameraToggle) this.cameraCtrl.toggle();
     if (edge.muteToggle) {
-      // M はエンジン音と BGM の両方をミュート/解除
-      const m = this.engineSound.toggleMute();
-      music.setMuted(m);
+      // M キー / SND ボタンはエンジン音と BGM の両方をミュート/解除
+      const m = toggleGlobalMuted();
+      this.engineSound.setMuted(m);
+      music.setMuted(m); // 解除時は保留中のコース曲もここから鳴り始める
+      if (!m) {
+        // 解除して初めて AudioContext を作る/再開する
+        this.engineSound.start();
+        this.engineSound.resume();
+      }
     }
 
     // 自動再生制限のため、最初のキー入力でオーディオを確実に起こす。
     // start() は冪等（既に Game.start で開始済み）。リロード直後（アーケードの
     // コース間）は AudioContext が suspended のことがあるので resume＋再生を保証する。
-    if (!this.audioStarted && this.input.anyKeyPressed) {
+    if (!this.audioStarted && this.input.anyKeyPressed && !isMuted()) {
       this.engineSound.start();
       this.engineSound.resume();
       music.resumeOnGesture();
